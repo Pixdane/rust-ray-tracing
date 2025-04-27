@@ -1,5 +1,6 @@
 use crate::{
     interval::Interval,
+    material::Material,
     ray::Ray,
     vector::{Point, Vector},
 };
@@ -8,15 +9,23 @@ use std::sync::Arc;
 pub struct HitRecord {
     point: Point,
     normal: Vector,
+    material: Arc<dyn Material>,
     t: f64,
     front_face: bool,
 }
 
 impl HitRecord {
-    pub fn new(point: Point, normal: Vector, t: f64, front_face: bool) -> Self {
+    pub fn new(
+        point: Point,
+        normal: Vector,
+        material: Arc<dyn Material>,
+        t: f64,
+        front_face: bool,
+    ) -> Self {
         HitRecord {
             point,
             normal,
+            material,
             t,
             front_face,
         }
@@ -28,6 +37,10 @@ impl HitRecord {
 
     pub fn normal(&self) -> Vector {
         self.normal
+    }
+
+    pub fn material(&self) -> Arc<dyn Material> {
+        self.material.clone()
     }
 
     pub fn t(&self) -> f64 {
@@ -83,11 +96,16 @@ impl Hittable for HittableList {
 pub struct Sphere {
     center: Point,
     radius: f64,
+    material: Arc<dyn Material>,
 }
 
 impl Sphere {
-    pub fn new(center: Point, radius: f64) -> Self {
-        Sphere { center, radius }
+    pub fn new(center: Point, radius: f64, material: Arc<dyn Material>) -> Self {
+        Sphere {
+            center,
+            radius,
+            material,
+        }
     }
 
     pub fn center(&self) -> Point {
@@ -107,7 +125,7 @@ impl Hittable for Sphere {
         let c: f64 = Vector::dot(&oc, &oc) - self.radius.powi(2);
         let disciminant: f64 = h.powi(2) - a * c;
 
-        if disciminant < 0.0 {
+        if disciminant < 0. {
             return None;
         }
 
@@ -121,7 +139,7 @@ impl Hittable for Sphere {
 
         let point: Point = ray.at(t);
         let outward_normal: Vector = (point - self.center) / self.radius;
-        let front_face: bool = ray.direction().dot(&outward_normal) < 0.0;
+        let front_face: bool = ray.direction().dot(&outward_normal) < 0.;
 
         let normal: Vector = if front_face {
             outward_normal
@@ -129,6 +147,12 @@ impl Hittable for Sphere {
             -outward_normal
         };
 
-        Some(HitRecord::new(point, normal, t, front_face))
+        Some(HitRecord::new(
+            point,
+            normal,
+            self.material.clone(),
+            t,
+            front_face,
+        ))
     }
 }

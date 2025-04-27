@@ -1,47 +1,58 @@
+use nalgebra::ComplexField;
+
+use crate::interval::Interval;
+
 extern crate nalgebra as na;
 
-#[derive(Debug, PartialEq, PartialOrd)]
-pub struct Color(pub na::Vector3<f64>);
+// #[derive(Debug, PartialEq, PartialOrd)]
+// pub struct Color(pub na::Vector3<f64>);
 
-impl Color {
-    pub fn new(r: f64, g: f64, b: f64) -> Self {
-        Color(na::Vector3::new(r, g, b))
+pub type Color = na::Vector3<f64>;
+
+pub trait Color3 {
+    const INTENSITY: Interval;
+    fn gamma_correction(_: f64) -> f64;
+    fn r(&self) -> f64;
+    fn g(&self) -> f64;
+    fn b(&self) -> f64;
+    fn r_byte(&self) -> u8;
+    fn g_byte(&self) -> u8;
+    fn b_byte(&self) -> u8;
+    fn write(&self) -> String;
+}
+
+impl Color3 for Color {
+    const INTENSITY: Interval = Interval::new(0., 0.999);
+
+    fn gamma_correction(color: f64) -> f64 {
+        color.try_sqrt().unwrap_or(0.)
     }
 
-    pub fn r(&self) -> f64 {
+    fn r(&self) -> f64 {
         self.x
     }
 
-    pub fn g(&self) -> f64 {
+    fn g(&self) -> f64 {
         self.y
     }
 
-    pub fn b(&self) -> f64 {
+    fn b(&self) -> f64 {
         self.z
     }
 
-    pub fn r_byte(&self) -> u8 {
-        (255.999 * self.r()).trunc() as u8
+    fn r_byte(&self) -> u8 {
+        (255.999 * Color::INTENSITY.clamps(Self::gamma_correction(self.r()))).trunc() as u8
     }
 
-    pub fn g_byte(&self) -> u8 {
-        (255.999 * self.g()).trunc() as u8
+    fn g_byte(&self) -> u8 {
+        (255.999 * Color::INTENSITY.clamps(Self::gamma_correction(self.g()))).trunc() as u8
     }
 
-    pub fn b_byte(&self) -> u8 {
-        (255.999 * self.b()).trunc() as u8
+    fn b_byte(&self) -> u8 {
+        (255.999 * Color::INTENSITY.clamps(Self::gamma_correction(self.b()))).trunc() as u8
     }
-}
 
-impl std::ops::Deref for Color {
-    type Target = na::Vector3<f64>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for Color {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.r_byte(), self.g_byte(), self.b_byte())
+    fn write(&self) -> String {
+        format!("{} {} {}", self.r_byte(), self.g_byte(), self.b_byte())
     }
 }

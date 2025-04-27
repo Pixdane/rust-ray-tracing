@@ -7,7 +7,7 @@ pub struct Interval {
 }
 
 impl Interval {
-    pub fn new(min: f64, max: f64) -> Self {
+    pub const fn new(min: f64, max: f64) -> Self {
         Interval { min, max }
     }
 
@@ -31,13 +31,15 @@ impl Interval {
         self.min < x && x < self.max
     }
 
-    pub const EMPTY: Self = Interval {
-        min: INFINITY,
-        max: -INFINITY,
-    };
+    pub fn clamps(&self, x: f64) -> f64 {
+        match x {
+            x if x < self.min => self.min,
+            x if x > self.max => self.max,
+            _ => x,
+        }
+    }
 
-    pub const UNIVERSE: Self = Interval {
-        min: -INFINITY,
-        max: INFINITY,
-    };
+    pub const EMPTY: Self = Interval::new(INFINITY, -INFINITY);
+
+    pub const UNIVERSE: Self = Interval::new(-INFINITY, INFINITY);
 }
