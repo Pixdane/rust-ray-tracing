@@ -1,3 +1,4 @@
 /target
 .DS_Store
 image.ppm
+src/old.rs

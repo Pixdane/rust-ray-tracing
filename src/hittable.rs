@@ -1,9 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
+    interval::Interval,
     ray::Ray,
     vector::{Point, Vector},
 };
+use std::sync::Arc;
 
 pub struct HitRecord {
     point: Point,
@@ -40,7 +40,7 @@ impl HitRecord {
 }
 
 pub trait Hittable: Send + Sync {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
+    fn hit(&self, ray: &Ray, time: Interval) -> Option<HitRecord>;
 }
 
 pub struct HittableList(Vec<Arc<dyn Hittable>>);
@@ -66,12 +66,12 @@ impl std::ops::DerefMut for HittableList {
 }
 
 impl Hittable for HittableList {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let mut closest = t_max;
+    fn hit(&self, ray: &Ray, time: Interval) -> Option<HitRecord> {
+        let mut closest = time.max();
         let mut result = None;
 
         for obj in self.iter() {
-            if let Some(rec) = obj.hit(ray, t_min, closest) {
+            if let Some(rec) = obj.hit(ray, Interval::new(time.min(), closest)) {
                 closest = rec.t();
                 result = Some(rec);
             }
@@ -100,7 +100,7 @@ impl Sphere {
 }
 
 impl Hittable for Sphere {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    fn hit(&self, ray: &Ray, time: Interval) -> Option<HitRecord> {
         let oc: Vector = self.center - ray.origin();
         let a: f64 = Vector::dot(&ray.direction(), &ray.direction());
         let h: f64 = ray.direction().dot(&oc);
@@ -112,9 +112,9 @@ impl Hittable for Sphere {
         }
 
         let mut t: f64 = (h - disciminant.sqrt()) / a;
-        if t <= t_min || t >= t_max {
+        if !time.surrounds(t) {
             t = (h + disciminant.sqrt()) / a;
-            if t <= t_min || t >= t_max {
+            if !time.surrounds(t) {
                 return None;
             }
         }

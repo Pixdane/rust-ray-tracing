@@ -1,11 +1,12 @@
 use crate::{
     color::Color,
-    hittable::{Hittable, HittableList},
+    hittable::Hittable,
+    interval::Interval,
     ray::Ray,
     vector::{Point, R3, Vector},
 };
 
-pub struct Scene {
+pub struct Camera {
     image_width: i32,
     image_height: i32,
     aspect_ratio: f64,
@@ -26,7 +27,7 @@ pub struct Scene {
     pixel_00_pos: Point,
 }
 
-impl Scene {
+impl Camera {
     pub fn new(
         image_width: i32,
         aspect_ratio: f64,
@@ -53,7 +54,7 @@ impl Scene {
             - viewport_v / 2.0;
         let pixel_00_pos: Point = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
-        Scene {
+        Camera {
             image_width,
             image_height,
             aspect_ratio,
@@ -121,34 +122,12 @@ impl Scene {
     pub fn pixel_00_pos(&self) -> Point {
         self.pixel_00_pos
     }
-}
 
-pub struct RayTracer {
-    scene: Scene,
-    hittable_list: HittableList,
-}
-
-impl RayTracer {
-    pub fn new(scene: Scene, hittable_list: HittableList) -> Self {
-        RayTracer {
-            scene,
-            hittable_list,
-        }
-    }
-
-    pub fn scene(&self) -> &Scene {
-        &self.scene
-    }
-
-    pub fn hittable_list(&self) -> &HittableList {
-        &self.hittable_list
-    }
-
-    pub fn draw(
+    pub fn render(
         &self,
-        colorizer: fn(&Ray, &dyn Hittable, f64, f64) -> Color,
-        t_min: f64,
-        t_max: f64,
+        world: &dyn Hittable,
+        colorizer: fn(&Ray, &dyn Hittable, Interval) -> Color,
+        time: Interval,
     ) {
         use itertools::Itertools;
         use log::info;
@@ -157,15 +136,15 @@ impl RayTracer {
 
         env_logger::init();
 
-        let image_width: i32 = self.scene.image_width();
-        let image_height: i32 = self.scene.image_height();
+        let image_width: i32 = self.image_width;
+        let image_height: i32 = self.image_height;
 
-        let camera_center: Point = self.scene.camera_center();
+        let camera_center: Point = self.camera_center;
 
-        let pixel_00_pos: Point = self.scene.pixel_00_pos();
+        let pixel_00_pos: Point = self.pixel_00_pos;
 
-        let pixel_delta_u: Vector = self.scene.pixel_delta_u();
-        let pixel_delta_v: Vector = self.scene.pixel_delta_v();
+        let pixel_delta_u: Vector = self.pixel_delta_u;
+        let pixel_delta_v: Vector = self.pixel_delta_v;
 
         println!("P3");
         println!("{} {}", image_width, image_height);
@@ -186,7 +165,7 @@ impl RayTracer {
 
                 let ray: Ray = Ray::new(camera_center, ray_direction);
 
-                colorizer(&ray, &self.hittable_list, t_min, t_max)
+                colorizer(&ray, world, time)
             })
             .collect_into_vec(&mut buf);
 
@@ -196,8 +175,8 @@ impl RayTracer {
         info!("Done. Time: {:?}.", duration);
     }
 
-    pub fn test_colorizer(ray: &Ray, hittable: &dyn Hittable, t_min: f64, t_max: f64) -> Color {
-        if let Some(hit_record) = hittable.hit(ray, t_min, t_max) {
+    pub fn test_colorizer(ray: &Ray, hittable: &dyn Hittable, time: Interval) -> Color {
+        if let Some(hit_record) = hittable.hit(ray, time) {
             Color(0.5 * (hit_record.normal() + Vector::from_element(1.0)))
         } else {
             let a: f64 = 0.5 * (ray.direction().normalize().y() + 1.0);

@@ -1,6 +1,7 @@
+pub mod camera;
 pub mod color;
-pub mod drawer;
 pub mod hittable;
+pub mod interval;
 pub mod old;
 pub mod ray;
 pub mod vector;
