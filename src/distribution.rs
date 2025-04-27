@@ -63,6 +63,17 @@ impl UniformUnitVec3D {
             -unit_vec
         }
     }
+
+    pub fn random_in_unit_disk() -> (f64, f64) {
+        let uniform = UniformOffset2D::new(-1., 1.);
+        let mut rng = rand::rng();
+        loop {
+            let (x, y) = uniform.sample(&mut rng);
+            if x.powi(2) + y.powi(2) < 1. {
+                return (x, y);
+            }
+        }
+    }
 }
 
 impl Distribution<Vector> for UniformUnitVec3D {

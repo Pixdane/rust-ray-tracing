@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::{
     color::{Color, Color3},
+    distribution::UniformUnitVec3D,
     hittable::{Hittable, HittableList},
     interval::Interval,
     ray::Ray,
@@ -20,7 +21,12 @@ pub struct Camera {
 
     pixel_00_pos: Point,
 
+    defocus_angle: f64,
+    defocus_disk_u: Vector,
+    defocus_disk_v: Vector,
+
     samples_per_pixel: i32,
+    pixel_samples_scale: f64,
     max_depth: i32,
 }
 
@@ -28,9 +34,12 @@ impl Camera {
     pub fn new(
         image_width: i32,
         aspect_ratio: f64,
-        viewport_height: f64,
-        camera_center: Point,
-        focal_length: f64,
+        vfov: f64,
+        look_from: Point,
+        look_at: Point,
+        vup: Vector,
+        defocus_angle: f64,
+        focus_dist: f64,
         samples_per_pixel: i32,
         max_depth: i32,
     ) -> Self {
@@ -39,18 +48,33 @@ impl Camera {
             if image_height < 1 { 1 } else { image_height }
         };
 
+        let pixel_samples_scale: f64 = 1.0 / f64::from(samples_per_pixel);
+
+        let camera_center: Point = look_from;
+
+        let theta: f64 = vfov.to_radians();
+        let h: f64 = (theta / 2.).tan();
+        let viewport_height: f64 = 2. * h * focus_dist;
         let viewport_width: f64 =
             viewport_height * (f64::from(image_width) / f64::from(image_height));
 
-        let viewport_u: Vector = Vector::new(viewport_width, 0., 0.);
-        let viewport_v: Vector = Vector::new(0., -viewport_height, 0.);
+        let w: Vector = (look_from - look_at).normalize();
+        let u: Vector = vup.cross(&w);
+        let v: Vector = w.cross(&u);
+
+        let viewport_u: Vector = viewport_width * u;
+        let viewport_v: Vector = viewport_height * -v;
 
         let pixel_delta_u: Vector = viewport_u / f64::from(image_width);
         let pixel_delta_v: Vector = viewport_v / f64::from(image_height);
 
         let viewport_upper_left: Point =
-            camera_center + Vector::new(0., 0., -focal_length) - viewport_u / 2. - viewport_v / 2.;
+            camera_center - focus_dist * w - viewport_u / 2. - viewport_v / 2.;
         let pixel_00_pos: Point = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+
+        let defocus_radius: f64 = (defocus_angle / 2.).to_radians().tan() * focus_dist;
+        let defocus_disk_u: Vector = u * defocus_radius;
+        let defocus_disk_v: Vector = v * defocus_radius;
 
         Camera {
             image_width,
@@ -59,7 +83,11 @@ impl Camera {
             pixel_delta_u,
             pixel_delta_v,
             pixel_00_pos,
+            defocus_angle,
+            defocus_disk_u,
+            defocus_disk_v,
             samples_per_pixel,
+            pixel_samples_scale,
             max_depth,
         }
     }
@@ -68,7 +96,15 @@ impl Camera {
         let pixel_center: Point = self.pixel_00_pos
             + (f64::from(i) + offset.0) * self.pixel_delta_u
             + (f64::from(j) + offset.1) * self.pixel_delta_v;
-        let ray_direction: Vector = pixel_center - self.camera_center;
+
+        let ray_origin: Point = if self.defocus_angle <= 0. {
+            self.camera_center
+        } else {
+            let offset = UniformUnitVec3D::random_in_unit_disk();
+            self.camera_center + offset.0 * self.defocus_disk_u + offset.1 * self.defocus_disk_v
+        };
+
+        let ray_direction: Vector = pixel_center - ray_origin;
 
         Ray::new(self.camera_center, ray_direction)
     }
@@ -100,8 +136,6 @@ impl Camera {
 
         let start = Instant::now();
 
-        let pixel_samples_scale: f64 = 1. / f64::from(self.samples_per_pixel);
-
         let pixels: Vec<(i32, i32)> = (0..self.image_height)
             .cartesian_product(0..self.image_width)
             .collect();
@@ -125,7 +159,7 @@ impl Camera {
                         colorizer(&ray, world.clone(), time, self.max_depth)
                     })
                     .sum::<Color>()
-                    * pixel_samples_scale
+                    * self.pixel_samples_scale
             })
             .collect_into_vec(&mut buf);
 
